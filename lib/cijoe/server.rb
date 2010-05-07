@@ -3,7 +3,7 @@ require 'erb'
 
 class CIJoe
   class Server < Sinatra::Base
-    attr_reader :joe
+    attr_reader :joes
 
     dir = File.dirname(File.expand_path(__FILE__))
 
@@ -12,24 +12,28 @@ class CIJoe
     set :static, true
     set :lock, true
 
-    before { joe.restore }
+    before { joes.each { |k, v| v.restore } }
 
-    get '/ping' do
-      if joe.building? || !joe.last_build || !joe.last_build.worked?
-        halt 412, joe.last_build ? joe.last_build.sha : "building"
+    get '/' do
+      erb(:index)
+    end
+
+    get '/:project/ping' do
+      if joes[params[:project]].building? || !joes[params[:project]].last_build || !joes[params[:project]].last_build.worked?
+        halt 412, joes[params[:project]].last_build ? joes[params[:project]].last_build.sha : "building"
       end
 
-      joe.last_build.sha
+      joes[params[:project]].last_build.sha
     end
 
-    get '/?' do
-      erb(:template, {}, :joe => joe)
+    get '/:project/?' do
+      erb(:template, {}, :joe => joes[params[:project]])
     end
 
-    post '/?' do
+    post '/:project/?' do
       payload = params[:payload].to_s
-      if payload.empty? || payload.include?(joe.git_branch)
-        joe.build
+      if payload.empty? || payload.include?(joes[params[:project]].git_branch)
+        joes[params[:project]].build
       end
       redirect request.path
     end
@@ -51,7 +55,7 @@ class CIJoe
 
       def cijoe_root
         root = request.path
-        root = "" if root == "/"
+        root = "" if root == "/" + (params[:project] || '')
         root
       end
     end
@@ -59,7 +63,10 @@ class CIJoe
     def initialize(*args)
       super
       check_project
-      @joe = CIJoe.new(options.project_path)
+      @joes = {}
+      options.project_path.each {|k,v|
+        @joes[k] = CIJoe.new(v)
+      }
 
       CIJoe::Campfire.activate
     end
@@ -70,21 +77,24 @@ class CIJoe
     end
 
     def self.project_path=(project_path)
-      user, pass = Config.cijoe(project_path).user.to_s, Config.cijoe(project_path).pass.to_s
-      if user != '' && pass != ''
-        use Rack::Auth::Basic do |username, password|
-          [ username, password ] == [ user, pass ]
-        end
-        puts "Using HTTP basic auth"
-      end
+      # FIXME: get him back
+      # user, pass = Config.cijoe(project_path).user.to_s, Config.cijoe(project_path).pass.to_s
+      # if user != '' && pass != ''
+      #   use Rack::Auth::Basic do |username, password|
+      #     [ username, password ] == [ user, pass ]
+      #   end
+      #   puts "Using HTTP basic auth"
+      # end
       set :project_path, Proc.new{project_path}
     end
 
     def check_project
-      if options.project_path.nil? || !File.exists?(File.expand_path(options.project_path))
-        puts "Whoops! I need the path to a Git repo."
-        puts "  $ git clone git@github.com:username/project.git project"
-        abort "  $ cijoe project"
+      options.project_path.each do |k,path|
+        if path.nil? || !File.exists?(File.expand_path(path))
+          puts "Whoops! I need the path to a Git repo."
+          puts "  $ git clone git@github.com:username/project.git project"
+          abort "  $ cijoe project"
+        end
       end
     end
   end

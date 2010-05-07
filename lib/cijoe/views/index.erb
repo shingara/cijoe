@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <link href="<%= cijoe_root %>/screen.css" media="screen" rel="stylesheet" type="text/css" />
+    <link rel="shortcut icon" href="<%= cijoe_root %>/favicon.ico" type="image/x-icon" />
+    <title> All project : CI Joe</title>
+  </head>
+  <body>
+    <div class="site">
+      <div class="title">
+        <a href="<%= cijoe_root %>/">CI Joe</a>
+        <span class="extra">because knowing is half the battle</span>
+      </div>
+      <div id="home">
+        <ul class="posts">
+          <% joes.each do |path, joe| %>
+            <li><a href="/<%= path %>"><%= joe.project %></a></li>
+          <% end %>
+        </ul>
+      </div>
+    </div>
+
+  </body>
+</html>
